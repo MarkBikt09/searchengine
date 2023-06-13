@@ -1,14 +1,14 @@
 package searchengine.dto.statistics;
 
-import lombok.Data;
+import searchengine.model.Status;
 
-@Data
-public class DetailedStatisticsItem {
-    private String url;
-    private String name;
-    private String status;
-    private long statusTime;
-    private String error;
-    private int pages;
-    private int lemmas;
+import java.util.Date;
+
+public record DetailedStatisticsItem(String url,
+                                     String name,
+                                     Status status,
+                                     Date statusTime,
+                                     String error,
+                                     long pages,
+                                     long lemmas) {
 }

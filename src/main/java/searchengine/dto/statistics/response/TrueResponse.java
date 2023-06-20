@@ -1,4 +1,4 @@
 package searchengine.dto.statistics.response;
 
-public record TrueResponse(boolean result) {
+public record TrueResponse(boolean result) implements Response {
 }

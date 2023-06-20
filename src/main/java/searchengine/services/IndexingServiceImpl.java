@@ -2,9 +2,14 @@ package searchengine.services;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
+import searchengine.dto.statistics.response.FalseResponse;
+import searchengine.dto.statistics.response.Response;
+import searchengine.dto.statistics.response.TrueResponse;
 import searchengine.model.Status;
 import searchengine.parsers.IndexParser;
 import searchengine.parsers.LemmaParser;
@@ -31,6 +36,34 @@ public class IndexingServiceImpl implements IndexingService {
     private final LemmaParser lemmaParser;
     private final IndexParser indexParser;
     private final SitesList sitesList;
+
+
+    @Override
+    public Response startIndexing(String url) {
+        if (url.isEmpty()) {
+            return new FalseResponse(false, "Укажите сайт для индексации");
+        } else {
+            if (siteRepository.findByUrl(url) == null) {
+                return new FalseResponse(false, "Указанный сайт не найден в базе");
+            }
+            removeSiteFromIndex(url);
+            urlIndexing(url);
+            return new TrueResponse(true);
+        }
+    }
+
+    @Override
+    public Response indexPage(String url) {
+        if (url.isEmpty()) {
+            return new FalseResponse(false, "Страница не указана");
+        } else {
+            if (urlIndexing(url)) {
+                return new TrueResponse(true);
+            } else {
+                return new FalseResponse(false, "Указанная страница за пределами конфигурационного файла");
+            }
+        }
+    }
 
     @Override
     public boolean urlIndexing(String url) {
@@ -65,12 +98,12 @@ public class IndexingServiceImpl implements IndexingService {
     }
 
     @Override
-    public boolean stopIndexing() {
+    public Response stopIndexing() {
         if (isIndexingActive()) {
             executorService.shutdownNow();
-            return true;
+            return new TrueResponse(true);
         } else {
-            return false;
+            return new FalseResponse(false, "Индексация не остановлена т.к. не запущена");
         }
     }
 

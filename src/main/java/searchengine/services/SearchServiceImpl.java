@@ -2,8 +2,13 @@ package searchengine.services;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import searchengine.dto.statistics.SearchDto;
+import searchengine.dto.statistics.response.FalseResponse;
+import searchengine.dto.statistics.response.Response;
+import searchengine.dto.statistics.response.SearchResponse;
 import searchengine.exception.NotAllSiteSearchException;
 import searchengine.model.Index;
 import searchengine.model.Lemma;
@@ -28,6 +33,26 @@ public class SearchServiceImpl implements SearchService {
     private final PageRepository pageRepository;
     private final IndexRepository indexRepository;
     private final SiteRepository siteRepository;
+
+    @Override
+    public Response search(String query, String site, int offset, int limit) {
+        if (query.isEmpty()) {
+            return new FalseResponse(false, "Задан пустой поисковый запрос");
+        } else {
+            List<SearchDto> searchData;
+            if (!site.isEmpty()) {
+                if (siteRepository.findByUrl(site) == null) {
+                    return new FalseResponse(false, "Указанная страница не найдена");
+                } else {
+                    searchData = siteSearch(query, site, offset, limit);
+                }
+            } else {
+                searchData = allSiteSearch(query, offset, limit);
+            }
+
+            return new SearchResponse(true, searchData.size(), searchData);
+        }
+    }
 
     @Override
     public List<SearchDto> allSiteSearch(String searchText, int offset, int limit) {

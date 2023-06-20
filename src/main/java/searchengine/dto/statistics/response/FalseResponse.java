@@ -1,4 +1,5 @@
 package searchengine.dto.statistics.response;
 
-public record FalseResponse(boolean result, String error) {
+public record FalseResponse(boolean result,
+                            String error) implements Response {
 }

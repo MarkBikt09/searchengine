@@ -2,8 +2,6 @@ package searchengine.services;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import searchengine.dto.statistics.SearchDto;
 import searchengine.dto.statistics.response.FalseResponse;
@@ -38,46 +36,35 @@ public class SearchServiceImpl implements SearchService {
     public Response search(String query, String site, int offset, int limit) {
         if (query.isEmpty()) {
             return new FalseResponse(false, "Задан пустой поисковый запрос");
-        } else {
-            List<SearchDto> searchData;
-            if (!site.isEmpty()) {
-                if (siteRepository.findByUrl(site) == null) {
-                    return new FalseResponse(false, "Указанная страница не найдена");
-                } else {
-                    searchData = siteSearch(query, site, offset, limit);
-                }
-            } else {
-                searchData = allSiteSearch(query, offset, limit);
-            }
-
-            return new SearchResponse(true, searchData.size(), searchData);
         }
+        if (!site.isEmpty() && siteRepository.findByUrl(site) == null) {
+            return new FalseResponse(false, "Указанная страница не найдена");
+        }
+        List<SearchDto> searchData;
+        if (!site.isEmpty()) {
+            searchData = siteSearch(query, site, offset, limit);
+        } else {
+            searchData = allSiteSearch(query, offset, limit);
+        }
+        return new SearchResponse(true, searchData.size(), searchData);
     }
 
     @Override
     public List<SearchDto> allSiteSearch(String searchText, int offset, int limit) {
         List<Site> siteList = siteRepository.findAll();
-        List<SearchDto> result = new ArrayList<>();
         List<Lemma> foundLemmaList = new ArrayList<>();
         List<String> textLemmaList = getLemmaFromSearchText(searchText);
-        for (Site site : siteList) {
-            foundLemmaList.addAll(getLemmaListFromSite(textLemmaList, site));
-        }
-        List<SearchDto> searchData = null;
-        for (Lemma l : foundLemmaList) {
-            if (l.getLemma().equals(searchText)) {
-                searchData = new ArrayList<>(getSearchDtoList(foundLemmaList, textLemmaList, offset, limit));
-                searchData.sort((o1, o2) -> Float.compare(o2.relevance(), o1.relevance()));
-                if (searchData.size() > limit) {
-                    for (int i = offset; i < limit; i++) {
-                        result.add(searchData.get(i));
-                    }
-                    return result;
-                }
+        siteList.forEach(site -> foundLemmaList.addAll(getLemmaListFromSite(textLemmaList, site)));
+        List<SearchDto> searchData = new ArrayList<>();
+        for (int i = 0; i < foundLemmaList.size(); i++) {
+            if (textLemmaList.contains(foundLemmaList.get(i).getLemma())) {
+                searchData.addAll(getSearchDtoList(foundLemmaList, textLemmaList, offset, limit));
+
             } else {
                 throw new NotAllSiteSearchException();
             }
         }
+        searchData = searchData.stream().distinct().sorted((o1, o2) -> Float.compare(o2.relevance(), o1.relevance())).toList();
         return searchData;
     }
 

@@ -8,6 +8,7 @@ import org.jsoup.select.Elements;
 import searchengine.dto.statistics.PageDto;
 import searchengine.utils.RandomUserAgent;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -31,10 +32,7 @@ public class PageUrlParser extends RecursiveTask<List<PageDto>> {
     @Override
     protected List<PageDto> compute() {
         try {
-            Connection.Response response = Jsoup.connect(url)
-                    .ignoreContentType(true)
-                    .userAgent(RandomUserAgent.getRandomUserAgent())
-                    .execute();
+            Connection.Response response = getResponse();
             Document document = response.parse();
             String html = document.outerHtml();
             int status = response.statusCode();
@@ -43,17 +41,7 @@ public class PageUrlParser extends RecursiveTask<List<PageDto>> {
             Elements elements = document.select(CSS_QUERY);
             List<PageUrlParser> taskList = new ArrayList<>();
             for (Element element : elements) {
-                String attributeUrl = element.absUrl(ATTRIBUTE_KEY);
-                if (!attributeUrl.isEmpty() && attributeUrl.startsWith(url) && !attributeUrl.contains("#") &&
-                        !attributeUrl.contains(".pdf") && !attributeUrl.contains(".jpg") && !attributeUrl.contains(".JPG")
-                        && !attributeUrl.contains(".png") && !WRITE_ARRAY_LIST.contains(attributeUrl) && !urlList.contains(attributeUrl)) {
-
-                    WRITE_ARRAY_LIST.add(attributeUrl);
-                    urlList.add(attributeUrl);
-                    PageUrlParser task = new PageUrlParser(attributeUrl, pageDtoList, urlList);
-                    task.fork();
-                    taskList.add(task);
-                }
+                addAttributeUrl(element, taskList);
             }
             taskList.sort(Comparator.comparing(PageUrlParser::getUrl));
             int i = 0;
@@ -68,13 +56,37 @@ public class PageUrlParser extends RecursiveTask<List<PageDto>> {
             pageDtoList.add(pageDto);
         }
 
+        sleep();
+
+        return pageDtoList;
+    }
+
+    private void addAttributeUrl(Element element, List<PageUrlParser> taskList) {
+        String attributeUrl = element.absUrl(ATTRIBUTE_KEY);
+        if (!attributeUrl.isEmpty() && attributeUrl.startsWith(url) && !attributeUrl.contains("#") &&
+                !attributeUrl.contains(".pdf") && !attributeUrl.contains(".jpg") && !attributeUrl.contains(".JPG")
+                && !attributeUrl.contains(".png") && !WRITE_ARRAY_LIST.contains(attributeUrl) && !urlList.contains(attributeUrl)) {
+
+            WRITE_ARRAY_LIST.add(attributeUrl);
+            urlList.add(attributeUrl);
+            PageUrlParser task = new PageUrlParser(attributeUrl, pageDtoList, urlList);
+            task.fork();
+            taskList.add(task);
+        }
+    }
+
+    private Connection.Response getResponse() throws IOException {
+        return Jsoup.connect(url)
+                .ignoreContentType(true)
+                .userAgent(RandomUserAgent.getRandomUserAgent())
+                .execute();
+    }
+    private void sleep() {
         try {
             Thread.sleep(150);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-
-        return pageDtoList;
     }
 
     public String getUrl() {

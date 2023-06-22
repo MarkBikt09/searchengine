@@ -27,14 +27,7 @@ public class LemmaBuild implements LemmaParser {
         Iterable<Page> pageList = pageRepository.findAll();
         TreeMap<String, Integer> lemmaList = new TreeMap<>();
         for (Page page : pageList) {
-            String content = page.getContent();
-            String title = ClearHtmlCode.clear(content, "title");
-            String body = ClearHtmlCode.clear(content, "body");
-            HashMap<String, Integer> titleList = morphology.getLemmaList(title);
-            HashMap<String, Integer> bodyList = morphology.getLemmaList(body);
-            Set<String> allWords = new HashSet<>();
-            allWords.addAll(titleList.keySet());
-            allWords.addAll(bodyList.keySet());
+            Set<String> allWords = getAllWords(page);
             for (String word : allWords) {
                 int frequency = lemmaList.getOrDefault(word, 0) + 1;
                 lemmaList.put(word, frequency);
@@ -44,6 +37,18 @@ public class LemmaBuild implements LemmaParser {
             Integer frequency = lemmaList.get(lemma);
             lemmaDtoList.add(new LemmaDto(lemma, frequency));
         }
+    }
+
+    private Set<String> getAllWords(Page page) {
+        String content = page.getContent();
+        String title = ClearHtmlCode.clear(content, "title");
+        String body = ClearHtmlCode.clear(content, "body");
+        HashMap<String, Integer> titleList = morphology.getLemmaList(title);
+        HashMap<String, Integer> bodyList = morphology.getLemmaList(body);
+        Set<String> allWords = new HashSet<>();
+        allWords.addAll(titleList.keySet());
+        allWords.addAll(bodyList.keySet());
+        return allWords;
     }
 
     @Override

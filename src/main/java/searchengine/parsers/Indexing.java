@@ -30,38 +30,57 @@ public class Indexing implements IndexParser {
         Iterable<Page> pageList = pageRepository.findBySiteId(site);
         List<Lemma> lemmaList = lemmaRepository.findBySiteEntityId(site);
         indexDtoList = new ArrayList<>();
-
         for (Page page : pageList) {
-            if (page.getCode() < 400) {
-                long pageId = page.getId();
-                String content = page.getContent();
-                String title = ClearHtmlCode.clear(content, "title");
-                String body = ClearHtmlCode.clear(content, "body");
-                HashMap<String, Integer> titleList = morphology.getLemmaList(title);
-                HashMap<String, Integer> bodyList = morphology.getLemmaList(body);
-
-                for (Lemma lemma : lemmaList) {
-                    Long lemmaId = lemma.getId();
-                    String keyWord = lemma.getLemma();
-                    if (titleList.containsKey(keyWord) || bodyList.containsKey(keyWord)) {
-                        float totalRank = 0.0F;
-                        if (titleList.get(keyWord) != null) {
-                            Float titleRank = Float.valueOf(titleList.get(keyWord));
-                            totalRank += titleRank;
-                        }
-                        if (bodyList.get(keyWord) != null) {
-                            float bodyRank = (float) (bodyList.get(keyWord) * 0.8);
-                            totalRank += bodyRank;
-                        }
-                        indexDtoList.add(new IndexDto(pageId, lemmaId, totalRank));
-                    } else {
-                        log.debug("Lemma not found");
-                    }
+            if (page.getCode() >= 400) {
+                logBadStatusCode(page.getCode());
+                continue;
+            }
+            long pageId = page.getId();
+            String content = page.getContent();
+            String title = ClearHtmlCode.clear(content, "title");
+            String body = ClearHtmlCode.clear(content, "body");
+            HashMap<String, Integer> titleList = getLemmaList(title);
+            HashMap<String, Integer> bodyList = getLemmaList(body);
+            for (Lemma lemma : lemmaList) {
+                Long lemmaId = lemma.getId();
+                String keyWord = lemma.getLemma();
+                if (!containsLemma(titleList, bodyList, keyWord)) {
+                    logLemmaNotFound();
+                    continue;
                 }
-            } else {
-                log.debug("Bad status code - " + page.getCode());
+                float totalRank = calculateTotalRank(titleList, bodyList, keyWord);
+                indexDtoList.add(new IndexDto(pageId, lemmaId, totalRank));
             }
         }
+    }
+
+    private void logBadStatusCode(int code) {
+        log.debug("Bad status code - " + code);
+    }
+
+    private HashMap<String, Integer> getLemmaList(String text) {
+        return morphology.getLemmaList(text);
+    }
+
+    private boolean containsLemma(HashMap<String, Integer> titleList, HashMap<String, Integer> bodyList, String keyWord) {
+        return titleList.containsKey(keyWord) || bodyList.containsKey(keyWord);
+    }
+
+    private void logLemmaNotFound() {
+        log.debug("Lemma not found");
+    }
+
+    private float calculateTotalRank(HashMap<String, Integer> titleList, HashMap<String, Integer> bodyList, String keyWord) {
+        float totalRank = 0.0F;
+        if (titleList.get(keyWord) != null) {
+            Float titleRank = Float.valueOf(titleList.get(keyWord));
+            totalRank += titleRank;
+        }
+        if (bodyList.get(keyWord) != null) {
+            float bodyRank = (float) (bodyList.get(keyWord) * 0.8);
+            totalRank += bodyRank;
+        }
+        return totalRank;
     }
 
     @Override

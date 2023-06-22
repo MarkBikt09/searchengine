@@ -40,7 +40,6 @@ public class SiteIndexed implements Runnable {
             saveToBase(pageDtoList);
             getLemmasPage();
             indexingWords();
-
         } catch (InterruptedException e) {
             errorSite();
             Thread.currentThread().interrupt();
@@ -62,13 +61,11 @@ public class SiteIndexed implements Runnable {
         if (!Thread.interrupted()) {
             Site site = siteRepository.findByUrl(url);
             List<Page> pageList = new ArrayList<>(pages.size());
-
             for (PageDto page : pages) {
                 int start = page.url().indexOf(url) + url.length();
                 String pageFormat = page.url().substring(start);
                 pageList.add(new Page(site, pageFormat, page.code(), page.content()));
             }
-
             pageRepository.saveAll(pageList);
             pageRepository.flush();
         } else {
@@ -83,11 +80,9 @@ public class SiteIndexed implements Runnable {
             lemmaParser.run(siteEntity);
             List<LemmaDto> lemmaDtoList = lemmaParser.getLemmaDtoList();
             List<Lemma> lemmaList = new ArrayList<>(lemmaDtoList.size());
-
             for (LemmaDto lemmaDto : lemmaDtoList) {
                 lemmaList.add(new Lemma(lemmaDto.lemma(), lemmaDto.frequency(), siteEntity));
             }
-
             lemmaRepository.saveAll(lemmaList);
             lemmaRepository.flush();
         } else {
@@ -102,19 +97,16 @@ public class SiteIndexed implements Runnable {
             List<IndexDto> indexDtoList = indexParser.getIndexList();
             List<Index> indexList = new ArrayList<>(indexDtoList.size());
             site.setStatusTime(new Date());
-
             for (IndexDto indexDto : indexDtoList) {
                 Page page = pageRepository.getReferenceById(indexDto.pageID());
                 Lemma lemma = lemmaRepository.getReferenceById(indexDto.lemmaID());
                 indexList.add(new Index(page, lemma, indexDto.rank()));
             }
-
             indexRepository.saveAll(indexList);
             indexRepository.flush();
             site.setStatusTime(new Date());
             site.setStatus(Status.INDEXED);
             siteRepository.save(site);
-
         } else {
             throw new InterruptedException();
         }

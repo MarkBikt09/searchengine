@@ -123,11 +123,18 @@ public class SearchServiceImpl implements SearchService {
         }
         Collections.sort(lemmaIndex);
         List<String> wordsList = getWordsFromContent(content, lemmaIndex);
-        for (int i = 0; i < wordsList.size(); i++) {
-            result.append(wordsList.get(i)).append("... ");
-            if (i > 3) {
-                break;
+        for (String word : wordsList) {
+            content = content.replaceAll(word, "<b>" + word + "</b>");
+        }
+        for (String s : wordsList) {
+            String word = "<b>" + s + "</b>";
+            int start = content.indexOf(word);
+
+            if (start != -1) {
+                String res = content.substring(start, start + 50);
+                result.append(res).append("...");
             }
+
         }
         return result.toString();
     }
@@ -146,28 +153,13 @@ public class SearchServiceImpl implements SearchService {
             String word = getWordsFromIndex(start, end, content);
             result.add(word);
         }
-        return result.stream()
+        return result.stream().distinct()
                 .sorted(Comparator.comparingInt(String::length).reversed())
                 .toList();
     }
 
     private String getWordsFromIndex(int start, int end, String content) {
-        String word = content.substring(start, end);
-        int prevPoint;
-        int lastPoint;
-        if (content.lastIndexOf(" ", start) != -1) {
-            prevPoint = content.lastIndexOf(" ", start);
-        } else prevPoint = start;
-        if (content.indexOf(" ", end + 30) != -1) {
-            lastPoint = content.indexOf(" ", end + 30);
-        } else lastPoint = content.indexOf(" ", end);
-        String text = content.substring(prevPoint, lastPoint);
-        try {
-            text = text.replaceAll(word, "<b>" + word + "</b>");
-        } catch (Exception e) {
-            log.error(e.getMessage());
-        }
-        return text;
+        return content.substring(start, end);
     }
 
     private List<SearchDto> getSearchDtoList(List<Lemma> lemmaList, List<String> textLemmaList, int offset, int limit) {

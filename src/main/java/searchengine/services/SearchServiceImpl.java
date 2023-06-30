@@ -59,7 +59,6 @@ public class SearchServiceImpl implements SearchService {
         for (int i = 0; i < foundLemmaList.size(); i++) {
             if (textLemmaList.contains(foundLemmaList.get(i).getLemma())) {
                 searchData.addAll(getSearchDtoList(foundLemmaList, textLemmaList, offset, limit));
-
             } else {
                 throw new NotAllSiteSearchException();
             }
@@ -110,52 +109,63 @@ public class SearchServiceImpl implements SearchService {
                     clearContent.append(title).append(" ").append(body);
                     String snippet = getSnippet(clearContent.toString(), textLemmaList);
 
-                    return new SearchDto(site, siteName, uri, title, snippet, absRelevance);
+                    return snippet.isEmpty() ? null : new SearchDto(site, siteName, uri, title, snippet, absRelevance);
                 })
                 .toList();
     }
 
     private String getSnippet(String content, List<String> lemmaList) {
-        List<Integer> lemmaIndex = new ArrayList<>();
+        Map<String, List<Integer>> lemmaIndexMap = new HashMap<>();
         StringBuilder result = new StringBuilder();
         for (String lemma : lemmaList) {
-            lemmaIndex.addAll(morphology.findLemmaIndexInText(content, lemma));
+            lemmaIndexMap.put(lemma, morphology.findLemmaIndexInText(content, lemma));
         }
-        Collections.sort(lemmaIndex);
-        List<String> wordsList = getWordsFromContent(content, lemmaIndex);
-        for (String word : wordsList) {
-            content = content.replaceAll(word, "<b>" + word + "</b>");
-        }
-        for (String s : wordsList) {
-            String word = "<b>" + s + "</b>";
-            int start = content.indexOf(word);
-
-            if (start != -1) {
-                String res = content.substring(start, start + 50);
-                result.append(res).append("...");
+        Map<String, List<String>> wordsListMap = getWordsFromContent(content, lemmaIndexMap);
+        for (Map.Entry<String, List<String>> entry : wordsListMap.entrySet()) {
+            if (entry.getValue().isEmpty()) {
+                return "";
             }
+            for (String word : entry.getValue()) {
+                content = content.replaceAll(word, "<b>" + word + "</b>");
+            }
+            for (int i = 0; i < entry.getValue().size(); i++) {
+                String word = "<b>" + entry.getValue().get(i) + "</b>";
+                int start = content.indexOf(word);
 
+                if (start != -1) {
+                    String res = content.substring(start, start + 50);
+                    result.append(res).append("...");
+                }
+            }
         }
         return result.toString();
     }
 
-    private List<String> getWordsFromContent(String content, List<Integer> lemmaIndex) {
-        List<String> result = new ArrayList<>();
-        for (int i = 0; i < lemmaIndex.size(); i++) {
-            int start = lemmaIndex.get(i);
-            int end = content.indexOf(" ", start);
-            int nextIndex = i + 1;
-            while (nextIndex < lemmaIndex.size() && lemmaIndex.get(nextIndex) - end > 0 && lemmaIndex.get(nextIndex) - end < 5) {
-                end = content.indexOf(" ", lemmaIndex.get(nextIndex));
-                nextIndex++;
+    private Map<String, List<String>> getWordsFromContent(String content, Map<String, List<Integer>> lemmaIndexMap) {
+        Map<String, List<String>> resultMap = new HashMap<>();
+        for (Map.Entry<String, List<Integer>> entry : lemmaIndexMap.entrySet()) {
+            List<Integer> lemmaIndex = new ArrayList<>(entry.getValue());
+            Collections.sort(lemmaIndex);
+            List<String> result = new ArrayList<>();
+            for (int i = 0; i < lemmaIndex.size(); i++) {
+                int start = lemmaIndex.get(i);
+                int end = content.indexOf(" ", start);
+                int nextIndex = i + 1;
+                while (nextIndex < lemmaIndex.size() && lemmaIndex.get(nextIndex) - end > 0 && lemmaIndex.get(nextIndex) - end < 5) {
+                    end = content.indexOf(" ", lemmaIndex.get(nextIndex));
+                    nextIndex++;
+                }
+                i = nextIndex - 1;
+                String word = getWordsFromIndex(start, end, content);
+                result.add(word);
             }
-            i = nextIndex - 1;
-            String word = getWordsFromIndex(start, end, content);
-            result.add(word);
+            resultMap.put(entry.getKey(),
+                    result.stream().distinct()
+                        .sorted(Comparator.comparingInt(String::length).reversed())
+                        .toList());
         }
-        return result.stream().distinct()
-                .sorted(Comparator.comparingInt(String::length).reversed())
-                .toList();
+        return resultMap;
+
     }
 
     private String getWordsFromIndex(int start, int end, String content) {
@@ -179,10 +189,19 @@ public class SearchServiceImpl implements SearchService {
 
             if (dataList.size() > limit) {
                 for (int i = offset; i < limit; i++) {
-                    result.add(dataList.get(i));
+                    if (dataList.get(i) != null) {
+                        result.add(dataList.get(i));
+                    }
                 }
                 return result;
-            } else return dataList;
+            } else {
+                for (SearchDto dto : dataList) {
+                    if (dto != null) {
+                        result.add(dto);
+                    }
+                }
+                return result;
+            }
         } else return result;
     }
 
